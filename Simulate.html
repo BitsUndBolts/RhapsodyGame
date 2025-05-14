@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWE64 Memory Chip Puzzle Game</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        .davenport-social-share-fixed.sidebar-position-disable {
+            display: none;
+        }
+
+        #chipCanvas {
+             /*left: -250px; /* For Wordpress */
+             /*position: relative; /* For Wordpress */
+            border: 2px solid #333;
+            background-color: #333; /* Dark gray background for the canvas */
+        }
+        .toggle-controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+        }
+        .toggle-control {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        button {
+            padding: 15px 30px; /* Larger buttons */
+            font-size: 20px; /* Larger font size */
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            color: white;
+        }
+        button:hover {
+            opacity: 0.9;
+        }
+        .toggle-on {
+            background-color: #4CAF50;
+        }
+        .toggle-off {
+            background-color: #f44336;
+        }
+        .turn-on {
+            background-color: #2196F3; /* Blue for Turn ON button */
+        }
+        .resolve {
+            background-color: #FF9800; /* Orange for Resolve button */
+        }
+        .restart {
+            background-color: #9C27B0; /* Purple for Restart button */
+        }
+
+        .vl {
+          border-left: 4px solid darkgreen;
+          height: 52px;
+        }
+    </style>
+</head>
+<body>
+    <h1>AWE64 Memory Chip Puzzle Game</h1>
+    <canvas id="chipCanvas" width="1675" height="986"></canvas>
+    <div class="toggle-controls">
+        <div class="toggle-control">
+            <button id="ras0" class="toggle-off" onclick="toggleRAS('ras0')">RAS0</button>
+        </div>
+        <div class="toggle-control">
+            <button id="ras1" class="toggle-off" onclick="toggleRAS('ras1')">RAS1</button>
+        </div>
+        <div class="toggle-control">
+            <button id="cas0" class="toggle-off" onclick="toggleCAS('cas0')">CAS0</button>
+        </div>
+        <div class="toggle-control">
+            <button id="cas2" class="toggle-off" onclick="toggleCAS('cas2')">CAS2</button>
+        </div>
+        <div class="vl"></div>
+        <div class="toggle-control">
+            <button id="restart" class="restart">New Game</button>
+        </div>
+        <div class="toggle-control">
+            <button id="resolve" class="resolve">Resolve</button>
+        </div>
+        <div class="toggle-control">
+            <button id="turnOn" class="turn-on">Check</button>
+        </div>
+    </div>
+
+    <!-- Load the external images.js file -->
+    <script src="images.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
