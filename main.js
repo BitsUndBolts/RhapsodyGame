@@ -1012,10 +1012,8 @@ turnOnButton.addEventListener('mousedown', () => {
     } else if (incorrectCount >= 1) {
         playBeep({
             notes: [
-                { hz: 369.99, duration: 0.15 }, // F#4
-                { hz: 293.66, duration: 0.15 }, // D4
-                { hz: 246.94, duration: 0.15 }, // B3
-                { hz: 180.94, duration: 0.3 }   // B3 (longer final note)
+                { hz: 140.94, duration: 0.1 },
+                { hz: 140.94, duration: 0.2 }
             ],
             volume: 0.05
         });
