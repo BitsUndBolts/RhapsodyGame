@@ -13,7 +13,15 @@ const CONFIG = {
     canvasWidth: 1675,
     canvasHeight: 986,
     maxPlacementAttempts: 100, // Maximum attempts to place a chip without overlap
-    startWidhCorrectPosition: true // if true positions the memory chips correctly on load
+    startWidhCorrectPosition: true, // if true positions the memory chips correctly on load
+    timerFontStyle: {
+        fontFamily: 'Arial',
+        fillStyle: '#66ff66', // Light green fill
+        strokeStyle: '#023020', // Dark green border
+        lineWidth: 5 // Border width
+    },
+    timerMarginTop: 30, // Margin from top edge (in pixels)
+    timerMarginRight: 310 // Margin from right edge (in pixels)
 };
 
 const canvas = document.getElementById('chipCanvas');
@@ -217,6 +225,12 @@ let lastSelectedChip = null;
 // Global AudioContext (created once)
 let audioCtx = null;
 let isPlaying = false; // Flag to track if a tune is currently playing
+let isRotating = false; // Track if a rotation is in progress
+let showInstruction = true; // Flag to show instruction text
+let timerStart = null; // Timestamp when timer starts
+let timerRunning = false; // Flag to track if timer is active
+let timerElapsed = 0; // Elapsed time in seconds (for when stopped)
+let timerInterval = null; // Interval ID for timer redraw
 
 // Initialize or resume AudioContext on first interaction
 function initializeAudioContext() {
@@ -343,6 +357,171 @@ function playBeep(options) {
             console.log('Tune finished, ready for next request');
         }
     }, totalDuration * 1000); // Convert seconds to milliseconds
+}
+
+// Play a swoosh sound for chip rotation
+function playSwoosh() {
+    if (isPlaying) {
+        if (CONFIG.showDebugOutput) {
+            console.log('Swoosh is already playing, ignoring new request');
+        }
+        return;
+    }
+
+    if (!audioCtx) {
+        initializeAudioContext();
+    }
+
+    isPlaying = true;
+
+    // Create a white noise source for the airy swoosh texture
+    const bufferSize = audioCtx.sampleRate * 0.12; // 0.12s duration for slightly slower sound
+    const noiseBuffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const noiseData = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        noiseData[i] = Math.random() * 2 - 1; // White noise
+    }
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    // Create a sine oscillator for the frequency glide
+    const oscillator = audioCtx.createOscillator();
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(200, audioCtx.currentTime); // Start at 200Hz for deeper sound
+    oscillator.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.1); // Glide to 50Hz
+
+    // Gain nodes for noise and oscillator
+    const noiseGain = audioCtx.createGain();
+    const oscGain = audioCtx.createGain();
+    noiseGain.gain.setValueAtTime(0.03, audioCtx.currentTime); // Keep noise volume
+    oscGain.gain.setValueAtTime(0.02, audioCtx.currentTime); // Keep oscillator volume
+
+    // Apply envelope to both sources
+    const envelope = audioCtx.createGain();
+    envelope.gain.setValueAtTime(0, audioCtx.currentTime);
+    envelope.gain.linearRampToValueAtTime(1, audioCtx.currentTime + 0.01); // Fast attack
+    envelope.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12); // Decay over 0.12s
+
+    // Connect nodes
+    noise.connect(noiseGain).connect(envelope);
+    oscillator.connect(oscGain).connect(envelope);
+    envelope.connect(audioCtx.destination);
+
+    // Start and stop
+    noise.start(audioCtx.currentTime);
+    oscillator.start(audioCtx.currentTime);
+    noise.stop(audioCtx.currentTime + 0.12);
+    oscillator.stop(audioCtx.currentTime + 0.12);
+
+    // Reset isPlaying after sound finishes
+    setTimeout(() => {
+        isPlaying = false;
+        if (CONFIG.showDebugOutput) {
+            console.log('Swoosh finished');
+        }
+    }, 120); // 120ms matches duration
+}
+
+function playClick() {
+    if (isPlaying) {
+        if (CONFIG.showDebugOutput) {
+            console.log('Click-clack sound is already playing, ignoring new request');
+        }
+        return;
+    }
+
+    if (!audioCtx) {
+        initializeAudioContext();
+    }
+
+    isPlaying = true;
+
+    // First sound: High-pitched "click"
+    const clickDuration = 0.03; // 10ms for sharp click
+    const clickBufferSize = audioCtx.sampleRate * clickDuration;
+    const clickNoiseBuffer = audioCtx.createBuffer(1, clickBufferSize, audioCtx.sampleRate);
+    const clickNoiseData = clickNoiseBuffer.getChannelData(0);
+    for (let i = 0; i < clickBufferSize; i++) {
+        clickNoiseData[i] = Math.random() * 2 - 1; // White noise
+    }
+    const clickNoise = audioCtx.createBufferSource();
+    clickNoise.buffer = clickNoiseBuffer;
+
+    // High-pass filter for click to make it brighter
+    const clickFilter = audioCtx.createBiquadFilter();
+    clickFilter.type = 'highpass';
+    clickFilter.frequency.setValueAtTime(400, audioCtx.currentTime); // High frequencies
+
+    // Gain for click
+    const clickGain = audioCtx.createGain();
+    clickGain.gain.setValueAtTime(0.12, audioCtx.currentTime); // Slightly louder
+    clickGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + clickDuration);
+
+    // Second sound: Lower-pitched "clack"
+    const clackDuration = 0.015; // 15ms for heavier clack
+    const clackBufferSize = audioCtx.sampleRate * clackDuration;
+    const clackNoiseBuffer = audioCtx.createBuffer(1, clackBufferSize, audioCtx.sampleRate);
+    const clackNoiseData = clackNoiseBuffer.getChannelData(0);
+    for (let i = 0; i < clackBufferSize; i++) {
+        clackNoiseData[i] = Math.random() * 2 - 1; // White noise
+    }
+    const clackNoise = audioCtx.createBufferSource();
+    clackNoise.buffer = clackNoiseBuffer;
+
+    // Low-pass filter for clack to make it deeper
+    const clackFilter = audioCtx.createBiquadFilter();
+    clackFilter.type = 'lowpass';
+    clackFilter.frequency.setValueAtTime(100, audioCtx.currentTime); // Lower frequencies
+
+    // Gain for clack
+    const clackGain = audioCtx.createGain();
+    clackGain.gain.setValueAtTime(0.1, audioCtx.currentTime); // Moderate volume
+    clackGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + clackDuration);
+
+    // Connect nodes
+    clickNoise.connect(clickFilter).connect(clickGain).connect(audioCtx.destination);
+    clackNoise.connect(clackFilter).connect(clackGain).connect(audioCtx.destination);
+
+    // Start and stop with 5ms gap between click and clack
+    clickNoise.start(audioCtx.currentTime);
+    clickNoise.stop(audioCtx.currentTime + clickDuration);
+    clackNoise.start(audioCtx.currentTime + clickDuration + 0.005); // 5ms gap
+    clackNoise.stop(audioCtx.currentTime + clickDuration + 0.005 + clackDuration);
+
+    // Reset isPlaying after sound finishes
+    const totalDuration = clickDuration + 0.005 + clackDuration; // ~30ms
+    setTimeout(() => {
+        isPlaying = false;
+        if (CONFIG.showDebugOutput) {
+            console.log('Click-clack sound finished');
+        }
+    }, totalDuration * 1000); // Convert to ms
+}
+
+function formatTime(seconds) {
+    if (seconds >= 3600) { // Cap at 59:59 (3600 seconds)
+        return '59:59';
+    }
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+}
+
+function startTimerInterval() {
+    if (!timerInterval) {
+        timerInterval = setInterval(() => {
+            if (timerRunning) {
+                draw(); // Redraw canvas every second
+            }
+        }, 1000);
+    }
+}
+
+function stopTimerInterval() {
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+    }
 }
 
 // Toggle RAS buttons
@@ -474,13 +653,83 @@ function validateChipConfiguration() {
     return chipStates;
 }
 
-// Rotate a chip by 90 degrees
+// Rotate a chip by 90 degrees with animation
 function rotateChip(chipName) {
+    if (isRotating) {
+        if (CONFIG.showDebugOutput) {
+            console.log('Rotation in progress, ignoring new request for:', chipName);
+        }
+        return;
+    }
+
     const chip = chips.find(c => c.name === chipName);
     if (chip) {
-        chip.rotation = (chip.rotation + 90) % 360;
-        draw();
+        isRotating = true; // Set flag to block new rotations
+        const startRotation = chip.rotation;
+        let targetRotation = (chip.rotation + 90) % 360;
+        // Special case: for 270 to 0, rotate forward to 360 (visually same as 0)
+        if (startRotation === 270 && targetRotation === 0) {
+            targetRotation = 360;
+        }
+        const animationDuration = 120; // 120ms to match swoosh sound
+        const startTime = performance.now();
+
+        // Play swoosh sound
+        playSwoosh();
+
+        // Animation loop
+        function animateRotation(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / animationDuration, 1); // 0 to 1
+            // Linear interpolation for smooth rotation
+            chip.rotation = startRotation + (targetRotation - startRotation) * progress;
+
+            // Redraw canvas
+            draw();
+
+            // Continue animation if not complete
+            if (progress < 1) {
+                requestAnimationFrame(animateRotation);
+            } else {
+                // Ensure final rotation is exact (reset to 0 if target is 360)
+                chip.rotation = targetRotation === 360 ? 0 : targetRotation;
+                isRotating = false; // Clear flag when animation completes
+                draw();
+            }
+        }
+
+        // Start animation
+        requestAnimationFrame(animateRotation);
     }
+}
+
+// Add this helper function after rotateChip function
+function isChipInValidRegion(chip) {
+    const chipBounds = getRotatedChipBounds(chip);
+
+    // Check all valid chip regions
+    for (const validChip of validChips) {
+        const validBounds = getRotatedChipBounds(validChip);
+        // Use the same bounds as the green debug border (CONFIG.chipMargin = 7)
+        const adjustedValidBounds = {
+            left: validBounds.left - CONFIG.chipMargin,
+            right: validBounds.right + CONFIG.chipMargin,
+            top: validBounds.top - CONFIG.chipMargin,
+            bottom: validBounds.bottom + CONFIG.chipMargin
+        };
+
+        // Check if chip is fully contained within the adjusted valid bounds
+        const isFullyContained =
+            chipBounds.left >= adjustedValidBounds.left &&
+            chipBounds.right <= adjustedValidBounds.right &&
+            chipBounds.top >= adjustedValidBounds.top &&
+            chipBounds.bottom <= adjustedValidBounds.bottom;
+
+        if (isFullyContained) {
+            return validChip; // Return the valid chip for snapping
+        }
+    }
+    return null; // No valid region found
 }
 
 // Resolve: Place all chips in their correct positions
@@ -493,6 +742,10 @@ function resolveGame() {
         chip.isDragging = false;
     });
     lastSelectedChip = null; // Clear selection
+    // Remove timer
+    timerRunning = false;
+    timerElapsed = 0;
+    stopTimerInterval(); // Stop redraw interval
     draw();
 }
 
@@ -508,10 +761,14 @@ function restartGame() {
     updateButtonState('ras1', ras1);
     updateButtonState('cas0', cas0);
     updateButtonState('cas2', cas2);
+    // Start timer
+    timerStart = performance.now();
+    timerRunning = true;
+    timerElapsed = 0;
+    startTimerInterval(); // Start redraw interval
     draw();
 }
 
-// Draw all elements on the canvas
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -600,6 +857,38 @@ function draw() {
 
         ctx.restore();
     });
+
+    // Draw instruction text if flag is true
+    if (showInstruction) {
+        ctx.save();
+        ctx.fillStyle = '#66ff66';
+        ctx.strokeStyle = '#023020';
+        ctx.lineWidth = 5;
+        ctx.font = '70px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const text = 'Rotate chips by pressing \'R\' on your keyboard';
+        ctx.strokeText(text, CONFIG.canvasWidth / 2, CONFIG.canvasHeight / 2);
+        ctx.fillText(text, CONFIG.canvasWidth / 2, CONFIG.canvasHeight / 2);
+        ctx.restore();
+    }
+
+    // Draw timer if running or stopped with elapsed time
+    if (timerRunning || timerElapsed > 0) {
+        ctx.save();
+        ctx.fillStyle = CONFIG.timerFontStyle.fillStyle; // Light green
+        ctx.strokeStyle = CONFIG.timerFontStyle.strokeStyle; // Dark green
+        ctx.lineWidth = CONFIG.timerFontStyle.lineWidth; // 5px border
+        ctx.font = `50px ${CONFIG.timerFontStyle.fontFamily}`; // 50px Arial
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'top';
+        const time = timerRunning
+            ? formatTime(Math.min(3599, (performance.now() - timerStart) / 1000))
+            : formatTime(timerElapsed);
+        ctx.strokeText(time, CONFIG.canvasWidth - CONFIG.timerMarginRight, CONFIG.timerMarginTop); // Use separate margins
+        ctx.fillText(time, CONFIG.canvasWidth - CONFIG.timerMarginRight, CONFIG.timerMarginTop);
+        ctx.restore();
+    }
 }
 
 // Mouse event handling for dragging
@@ -656,9 +945,22 @@ canvas.addEventListener('mousemove', (e) => {
 
 canvas.addEventListener('mouseup', () => {
     if (selectedChip) {
+        // Check if chip is in any valid region (green debug border area)
+        const validChip = isChipInValidRegion(selectedChip);
+        if (validChip) {
+            // Snap to valid position only (retain current rotation)
+            selectedChip.x = validChip.x;
+            selectedChip.y = validChip.y;
+            // Play click-clack sound
+            playClick();
+            if (CONFIG.showDebugOutput) {
+                console.log(`Snapped ${selectedChip.name} to valid position: x=${validChip.x}, y=${validChip.y}, rotation=${selectedChip.rotation} (retained)`);
+            }
+        }
+
         selectedChip.isDragging = false;
         selectedChip = null;
-        draw(); // Redraw to update highlight
+        draw(); // Redraw to update position
     }
 });
 
@@ -690,16 +992,23 @@ turnOnButton.addEventListener('mousedown', () => {
 
     // Play sound based on validation result
     if (incorrectCount === 0) {
-        // All chips are correct - play happy tune (C-E-G arpeggio)
+        // All chips are correct - play fanfare and stop timer
         playBeep({
             notes: [
-                { hz: 293.66, duration: 0.15 }, // D4
-                { hz: 369.99, duration: 0.15 }, // F#4
-                { hz: 440.00, duration: 0.15 }, // A4
-                { hz: 587.33, duration: 0.3 }   // D5
+                { hz: 261.63, duration: 0.15 }, // C4 (1 - lowest)
+                { hz: 329.63, duration: 0.15 }, // E4 (2)
+                { hz: 392.00, duration: 0.15 }, // G4 (3)
+                { hz: 523.25, duration: 0.15 }, // C5 (4 - highest)
+                { hz: 329.63, duration: 0.15 }, // E4 (2)
+                { hz: 523.25, duration: 0.3 }   // C5 (4 - longer final note)
             ],
-            volume: 0.05 // Increased volume
+            volume: 0.05 // Consistent volume
         });
+        if (timerRunning) {
+            timerElapsed = Math.min(3599, (performance.now() - timerStart) / 1000);
+            timerRunning = false;
+            stopTimerInterval(); // Stop redraw interval
+        }
     } else if (incorrectCount >= 1) {
         playBeep({
             notes: [
@@ -714,6 +1023,7 @@ turnOnButton.addEventListener('mousedown', () => {
 
     draw();
 });
+
 turnOnButton.addEventListener('mouseup', () => {
     isTurnOnPressed = false;
     draw();
@@ -733,3 +1043,9 @@ restartButton.addEventListener('click', () => {
 
 // Initial draw
 draw();
+
+// Turn off instruction text
+setTimeout(() => {
+    showInstruction = false;
+    draw(); // Redraw to remove text
+}, 5000); // 5 seconds
