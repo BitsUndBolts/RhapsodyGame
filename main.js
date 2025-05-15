@@ -998,7 +998,7 @@ turnOnButton.addEventListener('mousedown', () => {
                 { hz: 261.63, duration: 0.15 }, // C4 (1 - lowest)
                 { hz: 329.63, duration: 0.15 }, // E4 (2)
                 { hz: 392.00, duration: 0.15 }, // G4 (3)
-                { hz: 523.25, duration: 0.15 }, // C5 (4 - highest)
+                { hz: 523.25, duration: 0.3 }, // C5 (4 - highest)
                 { hz: 329.63, duration: 0.15 }, // E4 (2)
                 { hz: 523.25, duration: 0.3 }   // C5 (4 - longer final note)
             ],
