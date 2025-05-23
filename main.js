@@ -21,7 +21,7 @@ const CONFIG = {
         lineWidth: 5 // Border width
     },
     timerMarginTop: 30, // Margin from top edge (in pixels)
-    timerMarginRight: 310 // Margin from right edge (in pixels)
+    timerMarginRight: 330 // Margin from right edge (in pixels)
 };
 
 const canvas = document.getElementById('chipCanvas');
