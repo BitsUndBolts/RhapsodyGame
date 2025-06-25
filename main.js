@@ -3,7 +3,7 @@ const CONFIG = {
     chipWidth: 100, // Base width of chips
     chipHeight: 50, // Base height of chips
     chipScale: 2.4, // Initial chip scale
-    chipMargin: 7, // Margin around valid chip positions
+    chipMargin: 15, // Margin around valid chip positions
     bgScale: 0.9, // Initial background scale
     bgOpacity: 1.0, // Initial background opacity
     highlightColor: '#FF2200', // Highlight border for selected chip
@@ -20,8 +20,8 @@ const CONFIG = {
         strokeStyle: '#023020', // Dark green border
         lineWidth: 5 // Border width
     },
-    timerMarginTop: 30, // Margin from top edge (in pixels)
-    timerMarginRight: 330 // Margin from right edge (in pixels)
+    timerMarginTop: 34, // Margin from top edge (in pixels)
+    timerMarginRight: 680 // Margin from right edge (in pixels)
 };
 
 const canvas = document.getElementById('chipCanvas');
@@ -91,7 +91,7 @@ function placeChipsRandomly() {
         }
 
         while (!placed && attempts < CONFIG.maxPlacementAttempts) {
-            const maxX = CONFIG.canvasWidth - width;
+            const maxX = CONFIG.canvasWidth - width - 50;
             const maxY = CONFIG.canvasHeight - height;
             chipX = Math.random() * maxX;
             chipY = Math.random() * maxY;
@@ -150,6 +150,30 @@ function placeChipsRandomly() {
 // Initial chip placement
 if (CONFIG.startWidhCorrectPosition === false) {
     placeChipsRandomly();
+}
+
+function playFanfare() {
+    playBeep({
+        notes: [
+            { hz: 261.63, duration: 0.15 }, // C4 (1 - lowest)
+            { hz: 329.63, duration: 0.15 }, // E4 (2)
+            { hz: 392.00, duration: 0.15 }, // G4 (3)
+            { hz: 523.25, duration: 0.3 }, // C5 (4 - highest)
+            { hz: 329.63, duration: 0.15 }, // E4 (2)
+            { hz: 523.25, duration: 0.3 }   // C5 (4 - longer final note)
+        ],
+        volume: 0.05 // Consistent volume
+    });
+}
+
+function playFlop() {
+    playBeep({
+        notes: [
+            { hz: 140.94, duration: 0.1 },
+            { hz: 140.94, duration: 0.2 }
+        ],
+        volume: 0.05
+    });
 }
 
 // Load the background image (from images.js)
@@ -221,6 +245,7 @@ let isTurnOnPressed = false; // Track Turn ON button state
 
 // Track the last selected chip for rotation and highlighting
 let lastSelectedChip = null;
+let originalChipPosition = null;
 
 // Global AudioContext (created once)
 let audioCtx = null;
@@ -231,25 +256,6 @@ let timerStart = null; // Timestamp when timer starts
 let timerRunning = false; // Flag to track if timer is active
 let timerElapsed = 0; // Elapsed time in seconds (for when stopped)
 let timerInterval = null; // Interval ID for timer redraw
-
-// Initialize or resume AudioContext on first interaction
-function initializeAudioContext() {
-    if (!audioCtx) {
-        audioCtx = new AudioContext();
-        if (CONFIG.showDebugOutput) {
-            console.log('AudioContext created, state:', audioCtx.state);
-        }
-    }
-    if (audioCtx.state === 'suspended') {
-        audioCtx.resume().then(() => {
-            if (CONFIG.showDebugOutput) {
-                console.log('AudioContext resumed, state:', audioCtx.state);
-            }
-        }).catch(err => {
-            console.error('Failed to resume AudioContext:', err);
-        });
-    }
-}
 
 // Initialize or resume AudioContext on first interaction
 function initializeAudioContext() {
@@ -803,6 +809,7 @@ function draw() {
     let chipStates = chips.map(chip => ({ name: chip.name, isCorrect: true }));
     if (isTurnOnPressed) {
         chipStates = validateChipConfiguration();
+        lastSelectedChip = null; // Clear selection
     }
 
     // Draw chips
@@ -924,8 +931,11 @@ canvas.addEventListener('mousedown', (e) => {
         selectedChip.isDragging = true;
         offsetX = mouseX - selectedChip.x;
         offsetY = mouseY - selectedChip.y;
+        // Store original position
+        originalChipPosition = { x: selectedChip.x, y: selectedChip.y };
     } else {
         lastSelectedChip = null; // Deselect if no chip is clicked
+        originalChipPosition = null;
     }
     draw(); // Redraw to update highlight
 });
@@ -945,21 +955,35 @@ canvas.addEventListener('mousemove', (e) => {
 
 canvas.addEventListener('mouseup', () => {
     if (selectedChip) {
-        // Check if chip is in any valid region (green debug border area)
-        const validChip = isChipInValidRegion(selectedChip);
-        if (validChip) {
-            // Snap to valid position only (retain current rotation)
-            selectedChip.x = validChip.x;
-            selectedChip.y = validChip.y;
-            // Play click-clack sound
-            playClick();
-            if (CONFIG.showDebugOutput) {
-                console.log(`Snapped ${selectedChip.name} to valid position: x=${validChip.x}, y=${validChip.y}, rotation=${selectedChip.rotation} (retained)`);
+        // Only snap and play sound if the chip has moved
+        const hasMoved = originalChipPosition &&
+            (selectedChip.x !== originalChipPosition.x || selectedChip.y !== originalChipPosition.y);
+
+        if (hasMoved) {
+            // Check if chip is in any valid region (green debug border area)
+            const validChip = isChipInValidRegion(selectedChip);
+            if (validChip) {
+                // Snap to valid position only (retain current rotation)
+                selectedChip.x = validChip.x;
+                selectedChip.y = validChip.y;
+                if (CONFIG.showDebugOutput) {
+                    console.log(`Snapped ${selectedChip.name} to valid position: x=${validChip.x}, y=${validChip.y}, rotation=${selectedChip.rotation} (retained)`);
+                }
+
+                const chipStates = validateChipConfiguration();
+                const incorrectCount = chipStates.filter(state => !state.isCorrect).length;
+                if (timerRunning && incorrectCount === 0) {
+                    runCheckRoutine();
+                } else {
+                    // Play click-clack sound
+                    playClick();
+                }
             }
         }
 
         selectedChip.isDragging = false;
         selectedChip = null;
+        originalChipPosition = null;
         draw(); // Redraw to update position
     }
 });
@@ -973,9 +997,7 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Turn ON button events
-const turnOnButton = document.getElementById('turnOn');
-turnOnButton.addEventListener('mousedown', () => {
+function runCheckRoutine() {
     if (CONFIG.showDebugOutput) {
         console.log('Turn ON button pressed');
     }
@@ -993,34 +1015,22 @@ turnOnButton.addEventListener('mousedown', () => {
     // Play sound based on validation result
     if (incorrectCount === 0) {
         // All chips are correct - play fanfare and stop timer
-        playBeep({
-            notes: [
-                { hz: 261.63, duration: 0.15 }, // C4 (1 - lowest)
-                { hz: 329.63, duration: 0.15 }, // E4 (2)
-                { hz: 392.00, duration: 0.15 }, // G4 (3)
-                { hz: 523.25, duration: 0.3 }, // C5 (4 - highest)
-                { hz: 329.63, duration: 0.15 }, // E4 (2)
-                { hz: 523.25, duration: 0.3 }   // C5 (4 - longer final note)
-            ],
-            volume: 0.05 // Consistent volume
-        });
+        playFanfare();
         if (timerRunning) {
             timerElapsed = Math.min(3599, (performance.now() - timerStart) / 1000);
             timerRunning = false;
             stopTimerInterval(); // Stop redraw interval
         }
     } else if (incorrectCount >= 1) {
-        playBeep({
-            notes: [
-                { hz: 140.94, duration: 0.1 },
-                { hz: 140.94, duration: 0.2 }
-            ],
-            volume: 0.05
-        });
+        playFlop();
     }
 
     draw();
-});
+}
+
+// Turn ON button events
+const turnOnButton = document.getElementById('turnOn');
+turnOnButton.addEventListener('mousedown', runCheckRoutine);
 
 turnOnButton.addEventListener('mouseup', () => {
     isTurnOnPressed = false;
@@ -1030,12 +1040,14 @@ turnOnButton.addEventListener('mouseup', () => {
 // Resolve button event
 const resolveButton = document.getElementById('resolve');
 resolveButton.addEventListener('click', () => {
+    isTurnOnPressed = false;
     resolveGame();
 });
 
 // Restart button event
 const restartButton = document.getElementById('restart');
 restartButton.addEventListener('click', () => {
+    isTurnOnPressed = false;
     restartGame();
 });
 
