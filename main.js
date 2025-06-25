@@ -241,7 +241,7 @@ let ras0 = false;
 let ras1 = false;
 let cas0 = false;
 let cas2 = false;
-let isTurnOnPressed = false; // Track Turn ON button state
+let isCheckGamePressed = false; // Track Check Game button state
 
 // Track the last selected chip for rotation and highlighting
 let lastSelectedChip = null;
@@ -805,9 +805,9 @@ function draw() {
         });
     }
 
-    // Validate chips if Turn ON is pressed
+    // Validate chips if Check Game is pressed
     let chipStates = chips.map(chip => ({ name: chip.name, isCorrect: true }));
-    if (isTurnOnPressed) {
+    if (isCheckGamePressed) {
         chipStates = validateChipConfiguration();
         lastSelectedChip = null; // Clear selection
     }
@@ -824,7 +824,7 @@ function draw() {
         // Determine which image to use
         let imageToUse = chipImage;
         let imageLoaded = chipImageLoaded;
-        if (isTurnOnPressed) {
+        if (isCheckGamePressed) {
             const chipState = chipStates.find(cs => cs.name === chip.name);
             if (chipState.isCorrect) {
                 imageToUse = chipImageCorrect;
@@ -999,10 +999,10 @@ document.addEventListener('keydown', (e) => {
 
 function runCheckRoutine() {
     if (CONFIG.showDebugOutput) {
-        console.log('Turn ON button pressed');
+        console.log('Check Game button pressed');
     }
     initializeAudioContext(); // Ensure AudioContext is ready
-    isTurnOnPressed = true;
+    isCheckGamePressed = true;
     const chipStates = validateChipConfiguration();
     if (CONFIG.showDebugOutput) {
         console.log('Chip states:', chipStates); // Debug log for chip states
@@ -1028,26 +1028,26 @@ function runCheckRoutine() {
     draw();
 }
 
-// Turn ON button events
-const turnOnButton = document.getElementById('turnOn');
-turnOnButton.addEventListener('mousedown', runCheckRoutine);
+// Check Game button events
+const checkGameButton = document.getElementById('checkGame');
+checkGameButton.addEventListener('mousedown', runCheckRoutine);
 
-turnOnButton.addEventListener('mouseup', () => {
-    isTurnOnPressed = false;
+checkGameButton.addEventListener('mouseup', () => {
+    isCheckGamePressed = false;
     draw();
 });
 
 // Resolve button event
 const resolveButton = document.getElementById('resolve');
 resolveButton.addEventListener('click', () => {
-    isTurnOnPressed = false;
+    isCheckGamePressed = false;
     resolveGame();
 });
 
 // Restart button event
 const restartButton = document.getElementById('restart');
 restartButton.addEventListener('click', () => {
-    isTurnOnPressed = false;
+    isCheckGamePressed = false;
     restartGame();
 });
 
