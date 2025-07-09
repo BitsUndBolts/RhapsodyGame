@@ -907,7 +907,7 @@ canvas.addEventListener('mousedown', (e) => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
-    selectedChip = chips.find(chip => {
+    selectedChip = [...chips].reverse().find(chip => {
         const scaledWidth = CONFIG.chipWidth * CONFIG.chipScale;
         const scaledHeight = CONFIG.chipHeight * CONFIG.chipScale;
         const halfWidth = scaledWidth / 2;
