@@ -833,6 +833,9 @@ function draw() {
                 imageToUse = chipImageIncorrect;
                 imageLoaded = chipImageIncorrectLoaded;
             }
+        } else if (lastSelectedChip && chip.name === lastSelectedChip.name) {
+            imageToUse = chipImageSelected;
+            imageLoaded = chipImageSelectedLoaded;
         } else if (isChipSelected(chip.name)) {
             imageToUse = chipImageSelected;
             imageLoaded = chipImageSelectedLoaded;
@@ -845,13 +848,6 @@ function draw() {
             ctx.fillStyle = '#555';
             ctx.fillRect(0, 0, scaledWidth, scaledHeight);
             ctx.strokeStyle = '#000';
-            ctx.strokeRect(0, 0, scaledWidth, scaledHeight);
-        }
-
-        // Draw yellow highlight if this chip is the last selected chip
-        if (lastSelectedChip && chip.name === lastSelectedChip.name) {
-            ctx.strokeStyle = CONFIG.highlightColor;
-            ctx.lineWidth = CONFIG.highlightBorderWidth;
             ctx.strokeRect(0, 0, scaledWidth, scaledHeight);
         }
 
